@@ -16,7 +16,7 @@ from pathlib import Path
 from urllib.parse import urlparse, parse_qs
 
 PORT = 9876
-DEFAULT_DOWNLOAD_DIR = str(Path.home() / "Downloads" / "yt-dlp")
+DEFAULT_DOWNLOAD_DIR = str(Path.home() / "Downloads" / "yt-dl")
 
 # CORS headers for Chrome extension
 CORS_HEADERS = {

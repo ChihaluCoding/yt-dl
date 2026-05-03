@@ -1,4 +1,4 @@
-# YT-DLP Chrome拡張機能 + ローカルサーバー
+# YT-DL
 
 YouTubeの動画をyt-dlpでダウンロードするChrome拡張機能です。
 
@@ -41,8 +41,8 @@ python3 server/server.py
 
 起動すると以下のように表示されます：
 ```
-✅ yt-dlp version: 2024.xx.xx
-📁 デフォルト保存先: ~/Downloads/yt-dlp
+✅ yt-dlp version: 2026.xx.xx
+📁 デフォルト保存先: ~/Downloads/yt-dl ※変えたい場合は拡張機能のpopupから変更できます※
 🚀 サーバー起動中: http://localhost:9876
 ```
 
@@ -64,21 +64,8 @@ python3 server/server.py
 
 ---
 
-## サポートフォーマット
-
-| フォーマット | 種類 | 説明 |
-|---|---|---|
-| MP4 | 動画 | 最も互換性が高い |
-| WebM | 動画 | 高効率・オープン形式 |
-| MP3 | 音声のみ | 音楽・ポッドキャストに |
-| M4A | 音声のみ | 高品質AAC音声 |
-
----
-
 ## 注意事項
 
-- **個人利用・著作権フリーのコンテンツのみ**に使用してください
-- YouTubeの利用規約に従ってください
 - サーバーはlocalhost専用のため、外部からはアクセスできません
 
 ---
