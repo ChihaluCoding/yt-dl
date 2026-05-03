@@ -1,0 +1,360 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<title>YT-DLP</title>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@300;400;500;700&family=Syne:wght@700;800&display=swap');
+
+*{margin:0;padding:0;box-sizing:border-box}
+
+:root{
+  --bg:#080c10;
+  --panel:#0d1117;
+  --panel2:#161b22;
+  --border:#21262d;
+  --border2:#30363d;
+  --accent:#00d084;
+  --accent-dim:#00d08420;
+  --accent-glow:#00d08440;
+  --red:#ff4757;
+  --yellow:#ffd32a;
+  --blue:#00b4ff;
+  --text:#e6edf3;
+  --muted:#8b949e;
+  --mono:'JetBrains Mono',monospace;
+}
+
+body{
+  width:380px;
+  background:var(--bg);
+  color:var(--text);
+  font-family:var(--mono);
+  font-size:12px;
+  overflow:hidden;
+}
+
+/* ── HEADER ── */
+.hdr{
+  display:flex;
+  align-items:center;
+  gap:10px;
+  padding:14px 16px 12px;
+  border-bottom:1px solid var(--border);
+  background:var(--panel);
+  position:relative;
+}
+.hdr::after{
+  content:'';
+  position:absolute;
+  bottom:0;left:0;right:0;height:1px;
+  background:linear-gradient(90deg,transparent,var(--accent)40%,transparent);
+}
+.logo{
+  width:32px;height:32px;
+  background:linear-gradient(135deg,#00d084,#00b4ff);
+  border-radius:8px;
+  display:flex;align-items:center;justify-content:center;
+  flex-shrink:0;
+  box-shadow:0 0 16px var(--accent-glow);
+}
+.logo svg{width:16px;height:16px;fill:#080c10}
+.hdr-info h1{
+  font-family:'Syne',sans-serif;
+  font-size:14px;font-weight:800;
+  letter-spacing:0.06em;
+  color:var(--text);
+}
+.hdr-info .sub{
+  font-size:9px;color:var(--muted);letter-spacing:0.1em;margin-top:1px;
+}
+.server-pill{
+  margin-left:auto;
+  display:flex;align-items:center;gap:5px;
+  padding:3px 9px;
+  border-radius:99px;
+  border:1px solid var(--border2);
+  font-size:9px;color:var(--muted);
+  cursor:pointer;
+  transition:all .2s;
+}
+.server-pill:hover{border-color:var(--accent);color:var(--accent)}
+.dot{
+  width:5px;height:5px;border-radius:50%;
+  background:var(--red);
+  box-shadow:0 0 6px var(--red);
+  transition:background .3s,box-shadow .3s;
+}
+.dot.on{background:var(--accent);box-shadow:0 0 6px var(--accent-glow);animation:blink 2s infinite}
+@keyframes blink{0%,100%{opacity:1}50%{opacity:.5}}
+
+/* ── CONTENT ── */
+.content{padding:14px 16px}
+
+/* URL bar */
+.url-row{display:flex;gap:6px;margin-bottom:12px}
+#url-input{
+  flex:1;
+  background:var(--panel);
+  border:1px solid var(--border2);
+  border-radius:7px;
+  padding:8px 10px;
+  font-family:var(--mono);
+  font-size:10px;
+  color:var(--text);
+  outline:none;
+  transition:border .2s;
+  min-width:0;
+}
+#url-input:focus{border-color:var(--accent)}
+#url-input::placeholder{color:var(--muted)}
+#load-btn{
+  background:var(--panel2);
+  border:1px solid var(--border2);
+  border-radius:7px;
+  padding:8px 12px;
+  color:var(--text);
+  font-family:var(--mono);
+  font-size:10px;
+  cursor:pointer;
+  transition:all .2s;
+  white-space:nowrap;
+}
+#load-btn:hover{border-color:var(--accent);color:var(--accent)}
+
+/* Video info */
+#video-info{
+  background:var(--panel);
+  border:1px solid var(--border);
+  border-radius:10px;
+  overflow:hidden;
+  margin-bottom:12px;
+  display:none;
+}
+#video-info.show{display:block;animation:fadeUp .25s ease}
+@keyframes fadeUp{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:translateY(0)}}
+
+.thumb-row{position:relative;aspect-ratio:16/9;background:#000;overflow:hidden}
+.thumb-row img{width:100%;height:100%;object-fit:cover;display:block}
+.thumb-row::after{
+  content:'';position:absolute;inset:0;
+  background:linear-gradient(to top,rgba(8,12,16,.85) 0%,transparent 55%);
+}
+.dur{
+  position:absolute;bottom:7px;right:8px;z-index:1;
+  background:rgba(0,0,0,.8);
+  font-family:var(--mono);font-size:10px;
+  padding:2px 6px;border-radius:4px;color:#fff;
+}
+.vmeta{padding:10px 12px 12px}
+.vtitle{
+  font-size:11px;font-weight:500;line-height:1.45;
+  color:var(--text);margin-bottom:6px;
+  display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;
+}
+.vmeta-row{display:flex;gap:12px;align-items:center}
+.vtag{
+  font-size:9px;color:var(--muted);
+  display:flex;align-items:center;gap:3px;
+}
+
+/* Section label */
+.slabel{
+  font-size:9px;color:var(--muted);letter-spacing:0.12em;
+  text-transform:uppercase;margin-bottom:6px;
+}
+
+/* Format grid */
+.fmt-grid{display:grid;grid-template-columns:repeat(5,1fr);gap:5px;margin-bottom:12px}
+.fmt-btn{
+  background:var(--panel);border:1px solid var(--border);
+  border-radius:7px;padding:8px 4px;
+  text-align:center;cursor:pointer;transition:all .15s;
+}
+.fmt-btn:hover{border-color:var(--accent);background:var(--accent-dim)}
+.fmt-btn.active{border-color:var(--accent);background:var(--accent-dim);box-shadow:0 0 10px var(--accent-glow)}
+.fmt-name{font-size:11px;font-weight:700;color:var(--muted)}
+.fmt-btn.active .fmt-name{color:var(--accent)}
+.fmt-type{font-size:8px;color:var(--muted);margin-top:2px}
+
+/* Quality */
+.q-row{display:flex;flex-wrap:wrap;gap:5px;margin-bottom:12px}
+.q-chip{
+  background:var(--panel);border:1px solid var(--border);
+  border-radius:5px;padding:4px 8px;
+  font-size:9px;color:var(--muted);cursor:pointer;
+  transition:all .15s;
+}
+.q-chip:hover{color:var(--text);border-color:var(--border2)}
+.q-chip.active{background:var(--accent);border-color:var(--accent);color:#080c10;font-weight:700}
+
+/* Output dir */
+.dir-row{display:flex;gap:5px;margin-bottom:14px}
+#dir-input{
+  flex:1;
+  background:var(--panel);border:1px solid var(--border);
+  border-radius:6px;padding:7px 9px;
+  font-family:var(--mono);font-size:9px;color:var(--muted);
+  outline:none;min-width:0;
+}
+#dir-input:focus{border-color:var(--border2);color:var(--text)}
+.dir-label{font-size:9px;color:var(--muted);padding:7px 0;white-space:nowrap}
+
+/* Download btn */
+#dl-btn{
+  width:100%;
+  background:linear-gradient(135deg,#00d084,#00b4ff);
+  border:none;border-radius:9px;
+  padding:13px;
+  font-family:'Syne',sans-serif;
+  font-size:13px;font-weight:800;
+  letter-spacing:0.06em;
+  color:#080c10;
+  cursor:pointer;
+  transition:all .2s;
+  display:flex;align-items:center;justify-content:center;gap:8px;
+  box-shadow:0 4px 20px var(--accent-glow);
+}
+#dl-btn:hover{opacity:.9;box-shadow:0 6px 28px var(--accent-glow);transform:translateY(-1px)}
+#dl-btn:active{transform:translateY(0)}
+#dl-btn:disabled{
+  background:var(--panel2);border:1px solid var(--border);
+  color:var(--muted);cursor:not-allowed;
+  box-shadow:none;transform:none;opacity:1;
+}
+#dl-btn svg{width:15px;height:15px}
+
+/* Terminal log */
+#log-box{
+  margin-top:10px;
+  background:var(--panel);
+  border:1px solid var(--border);
+  border-radius:8px;
+  padding:10px;
+  font-size:9px;
+  line-height:1.7;
+  color:var(--muted);
+  max-height:90px;
+  overflow-y:auto;
+  display:none;
+  word-break:break-all;
+}
+#log-box.show{display:block}
+.log-ok{color:var(--accent)}
+.log-err{color:var(--red)}
+.log-info{color:var(--blue)}
+
+/* Server warning */
+#srv-warn{
+  margin-top:10px;
+  padding:10px 12px;
+  background:var(--panel);
+  border:1px solid var(--border);
+  border-left:3px solid var(--yellow);
+  border-radius:8px;
+  display:none;
+}
+#srv-warn.show{display:block}
+#srv-warn p{font-size:9px;color:var(--muted);line-height:1.6}
+#srv-warn strong{color:var(--yellow)}
+
+/* Spinner */
+@keyframes spin{to{transform:rotate(360deg)}}
+.spin{
+  display:inline-block;width:11px;height:11px;
+  border:2px solid rgba(8,12,16,.3);
+  border-top-color:#080c10;
+  border-radius:50%;animation:spin .5s linear infinite;
+}
+</style>
+</head>
+<body>
+
+<div class="hdr">
+  <div class="logo">
+    <svg viewBox="0 0 24 24"><path d="M19 9h-4V3H9v6H5l7 7 7-7zM5 18v2h14v-2H5z"/></svg>
+  </div>
+  <div class="hdr-info">
+    <h1>YT-DL</h1>
+    <div class="sub">LOCAL DOWNLOADER</div>
+  </div>
+  <div class="server-pill" id="srv-pill" title="サーバーに再接続">
+    <div class="dot" id="srv-dot"></div>
+    <span id="srv-label">確認中</span>
+  </div>
+</div>
+
+<div class="content">
+
+  <!-- URL -->
+  <div class="url-row">
+    <input id="url-input" type="text" placeholder="https://www.youtube.com/watch?v=...">
+    <button id="load-btn">情報取得</button>
+  </div>
+
+  <!-- Video card -->
+  <div id="video-info">
+    <div class="thumb-row">
+      <img id="thumb" src="" alt="">
+      <span class="dur" id="dur"></span>
+    </div>
+    <div class="vmeta">
+      <div class="vtitle" id="vtitle"></div>
+      <div class="vmeta-row">
+        <span class="vtag" id="vch">📺 —</span>
+        <span class="vtag" id="vviews"></span>
+      </div>
+    </div>
+  </div>
+
+  <!-- Format -->
+  <div class="slabel">フォーマット</div>
+  <div class="fmt-grid">
+    <div class="fmt-btn active" data-f="mp4"><div class="fmt-name">MP4</div><div class="fmt-type">動画</div></div>
+    <div class="fmt-btn" data-f="mov"><div class="fmt-name">MOV</div><div class="fmt-type">動画</div></div>
+    <div class="fmt-btn" data-f="webm"><div class="fmt-name">WebM</div><div class="fmt-type">動画</div></div>
+    <div class="fmt-btn" data-f="mp3"><div class="fmt-name">MP3</div><div class="fmt-type">音声</div></div>
+    <div class="fmt-btn" data-f="m4a"><div class="fmt-name">M4A</div><div class="fmt-type">音声</div></div>
+  </div>
+
+  <!-- Quality -->
+  <div id="q-section">
+    <div class="slabel">画質</div>
+    <div class="q-row">
+      <div class="q-chip" data-q="360">360p</div>
+      <div class="q-chip" data-q="480">480p</div>
+      <div class="q-chip active" data-q="720">720p HD</div>
+      <div class="q-chip" data-q="1080">1080p FHD</div>
+      <div class="q-chip" data-q="1440">1440p 2K</div>
+      <div class="q-chip" data-q="2160">4K</div>
+      <div class="q-chip" data-q="max">最高画質</div>
+    </div>
+  </div>
+
+  <!-- Output dir -->
+  <div class="slabel">保存先</div>
+  <div class="dir-row">
+    <input id="dir-input" type="text" placeholder="~/Downloads/yt-dlp">
+  </div>
+
+  <!-- Download -->
+  <button id="dl-btn" disabled>
+    <svg viewBox="0 0 24 24" fill="currentColor"><path d="M19 9h-4V3H9v6H5l7 7 7-7zM5 18v2h14v-2H5z"/></svg>
+    ダウンロード開始
+  </button>
+
+  <!-- Log -->
+  <div id="log-box"></div>
+
+  <!-- Server warning -->
+  <div id="srv-warn">
+    <p><strong>⚡ サーバーが起動していません</strong><br>
+    以下のコマンドでサーバーを起動してください:<br>
+    <code>python3 server/server.py</code></p>
+  </div>
+
+</div>
+
+<script src="popup.js"></script>
+</body>
+</html>
