@@ -32,13 +32,16 @@ body{
   color:var(--text);
   font-family:var(--sans);
   font-size:13px;
-  overflow:hidden;
+  max-height:600px;
+  overflow-x:hidden;
+  overflow-y:auto;
 }
 body.large-text{
   font-size:14px;
 }
 body.large-text #url-input,
 body.large-text #load-btn,
+body.large-text .meta-input,
 body.large-text .q-chip,
 body.large-text #log-box,
 body.large-text #srv-warn p{
@@ -224,6 +227,64 @@ body.large-text #dl-btn{
 .q-chip:hover{color:var(--accent);border-color:var(--accent);background:var(--accent-dim)}
 .q-chip.active{background:var(--accent);border-color:var(--accent);color:#fff;font-weight:700}
 
+/* Metadata */
+.meta-panel{
+  margin-bottom:12px;
+  border:1px solid var(--border);
+  border-radius:8px;
+  background:var(--panel);
+  overflow:hidden;
+}
+.meta-panel summary{
+  padding:10px 11px;
+  cursor:pointer;
+  font-weight:800;
+  list-style:none;
+}
+.meta-panel summary::-webkit-details-marker{display:none}
+.meta-panel summary::after{
+  content:'+';
+  float:right;
+  color:var(--muted);
+}
+.meta-panel[open] summary{
+  border-bottom:1px solid var(--border);
+}
+.meta-panel[open] summary::after{content:'-'}
+.meta-fields{
+  display:grid;
+  grid-template-columns:1fr 1fr;
+  gap:9px;
+  padding:10px 11px 12px;
+}
+.meta-field.full{grid-column:1 / -1}
+.meta-label{
+  display:block;
+  margin-bottom:4px;
+  font-size:11px;
+  font-weight:700;
+  color:var(--text);
+}
+.meta-input{
+  width:100%;
+  border:1px solid var(--border2);
+  border-radius:6px;
+  background:#fff;
+  color:var(--text);
+  font-family:var(--sans);
+  font-size:11px;
+  padding:7px 8px;
+  outline:none;
+}
+textarea.meta-input{
+  min-height:54px;
+  resize:vertical;
+}
+.meta-input:focus{
+  border-color:var(--accent);
+  box-shadow:0 0 0 3px var(--accent-glow);
+}
+
 /* Download btn */
 #dl-btn{
   width:100%;
@@ -356,6 +417,37 @@ body.large-text #dl-btn{
       <div class="q-chip" data-q="max">最高画質</div>
     </div>
   </div>
+
+  <!-- Metadata -->
+  <details class="meta-panel" id="meta-panel">
+    <summary>メタデータ編集</summary>
+    <div class="meta-fields">
+      <label class="meta-field full">
+        <span class="meta-label">タイトル</span>
+        <input class="meta-input" id="meta-title" type="text" autocomplete="off">
+      </label>
+      <label class="meta-field">
+        <span class="meta-label">アーティスト</span>
+        <input class="meta-input" id="meta-artist" type="text" autocomplete="off">
+      </label>
+      <label class="meta-field">
+        <span class="meta-label">アルバム</span>
+        <input class="meta-input" id="meta-album" type="text" autocomplete="off">
+      </label>
+      <label class="meta-field">
+        <span class="meta-label">ジャンル</span>
+        <input class="meta-input" id="meta-genre" type="text" autocomplete="off">
+      </label>
+      <label class="meta-field">
+        <span class="meta-label">日付</span>
+        <input class="meta-input" id="meta-date" type="text" inputmode="numeric" placeholder="2026">
+      </label>
+      <label class="meta-field full">
+        <span class="meta-label">コメント</span>
+        <textarea class="meta-input" id="meta-comment"></textarea>
+      </label>
+    </div>
+  </details>
 
   <!-- Download -->
   <button id="dl-btn" disabled>

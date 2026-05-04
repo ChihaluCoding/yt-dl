@@ -43,7 +43,7 @@ def get_video_info(url):
         raise Exception(result.stderr.strip() or "動画情報の取得に失敗しました")
     return json.loads(result.stdout)
 
-def build_yt_dlp_command(url, fmt, quality, output_dir):
+def build_yt_dlp_command(url, fmt, quality, output_dir, metadata=None):
     """yt-dlpコマンドを構築"""
     os.makedirs(output_dir, exist_ok=True)
     output_template = os.path.join(output_dir, "%(title)s.%(ext)s")
@@ -57,8 +57,18 @@ def build_yt_dlp_command(url, fmt, quality, output_dir):
             "-x",
             "--audio-format", fmt,
             "--audio-quality", "0",  # best
+            # webpサムネイルが残らないよう jpg に変換して埋め込む
+            "--embed-thumbnail",
+            "--convert-thumbnails", "jpg",
+            "--ppa", "ThumbnailsConvertor:-q:v 2",
         ]
+        metadata_args = build_metadata_args(metadata or {})
+        if metadata_args:
+            cmd += metadata_args
     elif fmt in {"mp4", "mov"}:
+        metadata_args = build_metadata_args(metadata or {})
+        if metadata_args:
+            cmd += metadata_args
         if fmt == "mov":
             video_selector = "bestvideo[ext=mp4][vcodec^=avc1]"
             audio_selector = "bestaudio[ext=m4a][acodec^=mp4a]"
@@ -87,11 +97,64 @@ def build_yt_dlp_command(url, fmt, quality, output_dir):
         cmd += ["-f", fmt_str, "--merge-output-format", fmt, "--remux-video", fmt]
     elif fmt == "webm":
         cmd += ["-f", "bestvideo[ext=webm]+bestaudio[ext=webm]/best[ext=webm]"]
+        metadata_args = build_metadata_args(metadata or {})
+        if metadata_args:
+            cmd += metadata_args
     else:
         cmd += ["-f", "best"]
+        metadata_args = build_metadata_args(metadata or {})
+        if metadata_args:
+            cmd += metadata_args
 
     cmd.append(url)
     return cmd
+
+
+def build_metadata_args(metadata):
+    """編集されたメタデータをyt-dlpの埋め込み設定に変換"""
+    field_map = [
+        ("title", ("title",)),
+        ("artist", ("artist", "album_artist")),
+        ("album", ("album",)),
+        ("genre", ("genre",)),
+        ("date", ("date",)),
+        ("comment", ("comment",)),
+    ]
+    args = [
+        "--replace-in-metadata",
+        "artist,artists,creator,creators,album,album_artist",
+        r"^(?i:na|n/a|none|unknown|null|-)$",
+        "",
+    ]
+    has_custom_metadata = False
+
+    for request_key, metadata_keys in field_map:
+        value = normalize_metadata_value(metadata.get(request_key, ""))
+        if not value:
+            continue
+        has_custom_metadata = True
+        for metadata_key in metadata_keys:
+            args += [
+                "--parse-metadata",
+                f"{escape_metadata_template(value)}:%(meta_{metadata_key})s",
+            ]
+
+    if not has_custom_metadata:
+        return []
+    return ["--embed-metadata", "--no-embed-info-json", *args]
+
+
+def normalize_metadata_value(value):
+    if not isinstance(value, str):
+        return ""
+    value = " ".join(value.replace("\0", "").splitlines()).strip()[:500]
+    if value.lower() in {"na", "n/a", "none", "unknown", "null", "-"}:
+        return ""
+    return value
+
+
+def escape_metadata_template(value):
+    return value.replace("\\", "\\\\").replace(":", "\\:").replace("%", "%%")
 
 class Handler(http.server.BaseHTTPRequestHandler):
     def log_message(self, format, *args):
@@ -132,11 +195,17 @@ class Handler(http.server.BaseHTTPRequestHandler):
                 info = get_video_info(url)
                 self.send_json(200, {
                     "title": info.get("title", ""),
+                    "artist": info.get("artist", ""),
+                    "artists": info.get("artists", []),
+                    "creator": info.get("creator", ""),
+                    "creators": info.get("creators", []),
                     "uploader": info.get("uploader", ""),
                     "duration": info.get("duration", 0),
                     "thumbnail": info.get("thumbnail", ""),
                     "formats": summarize_formats(info.get("formats", [])),
                     "view_count": info.get("view_count", 0),
+                    "description": info.get("description", ""),
+                    "upload_date": info.get("upload_date", ""),
                 })
             except Exception as e:
                 self.send_json(500, {"error": str(e)})
@@ -159,6 +228,9 @@ class Handler(http.server.BaseHTTPRequestHandler):
             fmt = req.get("format", "mp4")
             quality = req.get("quality", "720")
             output_dir = req.get("outputDir", DEFAULT_DOWNLOAD_DIR)
+            metadata = req.get("metadata", {})
+            if not isinstance(metadata, dict):
+                metadata = {}
 
             if not url:
                 self.send_json(400, {"error": "url is required"})
@@ -169,7 +241,7 @@ class Handler(http.server.BaseHTTPRequestHandler):
             self.send_json(200, {"status": "started", "jobId": job_id, "outputDir": output_dir})
 
             def run():
-                cmd = build_yt_dlp_command(url, fmt, quality, output_dir)
+                cmd = build_yt_dlp_command(url, fmt, quality, output_dir, metadata)
                 print(f"\n[yt-dlp] Running: {' '.join(cmd)}\n")
                 proc = subprocess.Popen(
                     cmd,

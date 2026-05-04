@@ -12,6 +12,7 @@ let selectedFormat = 'mp4';
 let selectedQuality = '720';
 let serverOnline = false;
 let settings = { ...DEFAULT_SETTINGS };
+let currentInfo = null;
 
 const urlInput = document.getElementById('url-input');
 const loadBtn  = document.getElementById('load-btn');
@@ -25,6 +26,12 @@ const settingsBtn = document.getElementById('settings-btn');
 const videoInfo = document.getElementById('video-info');
 const qSection  = document.getElementById('q-section');
 const apiUrlLabel = document.getElementById('api-url-label');
+const metaTitle = document.getElementById('meta-title');
+const metaArtist = document.getElementById('meta-artist');
+const metaAlbum = document.getElementById('meta-album');
+const metaGenre = document.getElementById('meta-genre');
+const metaDate = document.getElementById('meta-date');
+const metaComment = document.getElementById('meta-comment');
 
 // ── Init ──────────────────────────────────────────────
 document.addEventListener('DOMContentLoaded', async () => {
@@ -100,6 +107,7 @@ async function loadInfo(url) {
   loadBtn.disabled = true;
   dlBtn.disabled = true;
   videoInfo.classList.remove('show');
+  currentInfo = null;
   log('⟳ 動画情報を取得中...', 'info');
 
   try {
@@ -118,6 +126,8 @@ async function loadInfo(url) {
       ? `👁 ${Number(d.view_count).toLocaleString()}`
       : '';
     document.getElementById('dur').textContent = fmtDur(d.duration || 0);
+    currentInfo = d;
+    applyInfoToMetadata(d);
 
     videoInfo.classList.add('show');
     dlBtn.disabled = false;
@@ -146,7 +156,8 @@ dlBtn.addEventListener('click', async () => {
         url: currentUrl,
         format: selectedFormat,
         quality: selectedQuality,
-        outputDir: outputDir || undefined
+        outputDir: outputDir || undefined,
+        metadata: readMetadata()
       }),
       signal: AbortSignal.timeout(10000)
     });
@@ -195,6 +206,48 @@ function setActiveByData(selector, key, value) {
 
 function normalizeApiBase(value) {
   return String(value || DEFAULT_SETTINGS.apiBase).replace(/\/+$/, '');
+}
+
+function applyInfoToMetadata(info) {
+  metaTitle.value = info.title || '';
+  metaArtist.value = firstText(info.artist, info.artists, info.creator, info.creators, info.uploader);
+  metaAlbum.value = '';
+  metaGenre.value = '';
+  metaDate.value = formatUploadDate(info.upload_date || '');
+  metaComment.value = info.description || '';
+}
+
+function readMetadata() {
+  return {
+    title: metaTitle.value.trim(),
+    artist: metaArtist.value.trim(),
+    album: metaAlbum.value.trim(),
+    genre: metaGenre.value.trim(),
+    date: metaDate.value.trim(),
+    comment: metaComment.value.trim()
+  };
+}
+
+function formatUploadDate(value) {
+  if (!/^\d{8}$/.test(value)) return '';
+  return `${value.slice(0, 4)}-${value.slice(4, 6)}-${value.slice(6)}`;
+}
+
+function firstText(...values) {
+  for (const value of values) {
+    if (Array.isArray(value) && value.length) {
+      const text = value.filter(isUsefulMetadataText).join(', ');
+      if (text) return text;
+    }
+    if (isUsefulMetadataText(value)) return value.trim();
+  }
+  return '';
+}
+
+function isUsefulMetadataText(value) {
+  if (typeof value !== 'string') return false;
+  const text = value.trim();
+  return text && !['na', 'n/a', 'none', 'unknown', 'null', '-'].includes(text.toLowerCase());
 }
 
 function isYtUrl(url) {
