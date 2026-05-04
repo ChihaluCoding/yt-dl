@@ -1,9 +1,17 @@
-const API = 'http://localhost:9876';
+const DEFAULT_SETTINGS = {
+  apiBase: 'http://localhost:9876',
+  outputDir: '',
+  format: 'mp4',
+  quality: '720',
+  autoLoadInfo: true,
+  textSize: 'normal'
+};
 
 let currentUrl = '';
 let selectedFormat = 'mp4';
 let selectedQuality = '720';
 let serverOnline = false;
+let settings = { ...DEFAULT_SETTINGS };
 
 const urlInput = document.getElementById('url-input');
 const loadBtn  = document.getElementById('load-btn');
@@ -13,12 +21,15 @@ const srvWarn  = document.getElementById('srv-warn');
 const srvDot   = document.getElementById('srv-dot');
 const srvLabel = document.getElementById('srv-label');
 const srvPill  = document.getElementById('srv-pill');
+const settingsBtn = document.getElementById('settings-btn');
 const videoInfo = document.getElementById('video-info');
 const qSection  = document.getElementById('q-section');
-const dirInput  = document.getElementById('dir-input');
+const apiUrlLabel = document.getElementById('api-url-label');
 
 // ── Init ──────────────────────────────────────────────
 document.addEventListener('DOMContentLoaded', async () => {
+  settings = await loadSettings();
+  applySettings(settings);
   await checkServer();
 
   // Auto-fill current YouTube tab URL
@@ -27,7 +38,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     if (tab?.url && isYtUrl(tab.url)) {
       urlInput.value = tab.url;
       currentUrl = tab.url;
-      if (serverOnline) await loadInfo(tab.url);
+      if (serverOnline && settings.autoLoadInfo) await loadInfo(tab.url);
     }
   } catch (_) {}
 });
@@ -35,7 +46,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 // ── Server check ──────────────────────────────────────
 async function checkServer() {
   try {
-    const r = await fetch(`${API}/ping`, { signal: AbortSignal.timeout(2000) });
+    const r = await fetch(`${settings.apiBase}/ping`, { signal: AbortSignal.timeout(2000) });
     const d = await r.json();
     serverOnline = true;
     srvDot.classList.add('on');
@@ -47,11 +58,12 @@ async function checkServer() {
     srvDot.classList.remove('on');
     srvLabel.textContent = 'オフライン';
     srvWarn.classList.add('show');
-    log('✘ サーバーに接続できません (localhost:9876)', 'err');
+    log(`✘ サーバーに接続できません (${settings.apiBase})`, 'err');
   }
 }
 
 srvPill.addEventListener('click', () => checkServer());
+settingsBtn.addEventListener('click', () => chrome.runtime.openOptionsPage());
 
 // ── Format ────────────────────────────────────────────
 document.querySelectorAll('.fmt-btn').forEach(b => {
@@ -91,7 +103,7 @@ async function loadInfo(url) {
   log('⟳ 動画情報を取得中...', 'info');
 
   try {
-    const r = await fetch(`${API}/info?url=${encodeURIComponent(url)}`, {
+    const r = await fetch(`${settings.apiBase}/info?url=${encodeURIComponent(url)}`, {
       signal: AbortSignal.timeout(30000)
     });
     if (!r.ok) throw new Error(`HTTP ${r.status}`);
@@ -124,10 +136,10 @@ dlBtn.addEventListener('click', async () => {
   dlBtn.disabled = true;
   dlBtn.innerHTML = '<span class="spin"></span> 送信中...';
 
-  const outputDir = dirInput.value.trim() || '';
+  const outputDir = settings.outputDir.trim();
 
   try {
-    const r = await fetch(`${API}/download`, {
+    const r = await fetch(`${settings.apiBase}/download`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
@@ -153,6 +165,38 @@ dlBtn.addEventListener('click', async () => {
 });
 
 // ── Helpers ───────────────────────────────────────────
+async function loadSettings() {
+  return new Promise(resolve => {
+    chrome.storage.sync.get(DEFAULT_SETTINGS, saved => {
+      resolve({
+        ...DEFAULT_SETTINGS,
+        ...saved,
+        apiBase: normalizeApiBase(saved.apiBase || DEFAULT_SETTINGS.apiBase)
+      });
+    });
+  });
+}
+
+function applySettings(nextSettings) {
+  selectedFormat = nextSettings.format;
+  selectedQuality = nextSettings.quality;
+  apiUrlLabel.textContent = nextSettings.apiBase;
+  document.body.classList.toggle('large-text', nextSettings.textSize === 'large');
+  setActiveByData('.fmt-btn', 'f', selectedFormat);
+  setActiveByData('.q-chip', 'q', selectedQuality);
+  qSection.style.display = ['mp3','m4a'].includes(selectedFormat) ? 'none' : 'block';
+}
+
+function setActiveByData(selector, key, value) {
+  document.querySelectorAll(selector).forEach(el => {
+    el.classList.toggle('active', el.dataset[key] === value);
+  });
+}
+
+function normalizeApiBase(value) {
+  return String(value || DEFAULT_SETTINGS.apiBase).replace(/\/+$/, '');
+}
+
 function isYtUrl(url) {
   try {
     const u = new URL(url);

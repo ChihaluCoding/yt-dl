@@ -9,29 +9,48 @@
 *{margin:0;padding:0;box-sizing:border-box}
 
 :root{
-  --bg:#080c10;
-  --panel:#0d1117;
-  --panel2:#161b22;
-  --border:#21262d;
-  --border2:#30363d;
-  --accent:#00d084;
-  --accent-dim:#00d08420;
-  --accent-glow:#00d08440;
-  --red:#ff4757;
-  --yellow:#ffd32a;
-  --blue:#00b4ff;
-  --text:#e6edf3;
-  --muted:#8b949e;
+  --bg:#f5f7fb;
+  --panel:#ffffff;
+  --panel2:#eef3f8;
+  --border:#d7dee8;
+  --border2:#b8c4d2;
+  --accent:#087f5b;
+  --accent-dim:#e3f7ef;
+  --accent-glow:#087f5b26;
+  --red:#c92a2a;
+  --yellow:#b7791f;
+  --blue:#0b65c2;
+  --text:#17212f;
+  --muted:#4f5f72;
+  --sans:-apple-system,BlinkMacSystemFont,"Hiragino Sans","Yu Gothic",Meiryo,"Segoe UI",sans-serif;
   --mono:'JetBrains Mono',monospace;
 }
 
 body{
-  width:380px;
+  width:400px;
   background:var(--bg);
   color:var(--text);
-  font-family:var(--mono);
-  font-size:12px;
+  font-family:var(--sans);
+  font-size:13px;
   overflow:hidden;
+}
+body.large-text{
+  font-size:14px;
+}
+body.large-text #url-input,
+body.large-text #load-btn,
+body.large-text .q-chip,
+body.large-text #log-box,
+body.large-text #srv-warn p{
+  font-size:12px;
+}
+body.large-text .slabel,
+body.large-text .fmt-name,
+body.large-text .vtitle{
+  font-size:13px;
+}
+body.large-text #dl-btn{
+  font-size:15px;
 }
 
 /* ── HEADER ── */
@@ -39,10 +58,11 @@ body{
   display:flex;
   align-items:center;
   gap:10px;
-  padding:14px 16px 12px;
+  padding:15px 17px 13px;
   border-bottom:1px solid var(--border);
   background:var(--panel);
   position:relative;
+  box-shadow:0 1px 0 rgba(23,33,47,.04);
 }
 .hdr::after{
   content:'';
@@ -52,44 +72,58 @@ body{
 }
 .logo{
   width:32px;height:32px;
-  background:linear-gradient(135deg,#00d084,#00b4ff);
+  background:linear-gradient(135deg,#12b886,#228be6);
   border-radius:8px;
   display:flex;align-items:center;justify-content:center;
   flex-shrink:0;
-  box-shadow:0 0 16px var(--accent-glow);
+  box-shadow:0 6px 14px var(--accent-glow);
 }
-.logo svg{width:16px;height:16px;fill:#080c10}
+.logo svg{width:16px;height:16px;fill:#fff}
 .hdr-info h1{
   font-family:'Syne',sans-serif;
-  font-size:14px;font-weight:800;
-  letter-spacing:0.06em;
+  font-size:15px;font-weight:800;
   color:var(--text);
 }
 .hdr-info .sub{
-  font-size:9px;color:var(--muted);letter-spacing:0.1em;margin-top:1px;
+  font-family:var(--mono);
+  font-size:10px;color:var(--muted);margin-top:1px;
 }
 .server-pill{
   margin-left:auto;
   display:flex;align-items:center;gap:5px;
-  padding:3px 9px;
+  padding:4px 10px;
   border-radius:99px;
   border:1px solid var(--border2);
-  font-size:9px;color:var(--muted);
+  background:var(--panel);
+  font-family:var(--mono);
+  font-size:10px;color:var(--muted);
   cursor:pointer;
   transition:all .2s;
 }
-.server-pill:hover{border-color:var(--accent);color:var(--accent)}
+.server-pill:hover{border-color:var(--accent);color:var(--accent);background:var(--accent-dim)}
+.settings-btn{
+  width:28px;height:28px;
+  border:1px solid var(--border2);
+  border-radius:8px;
+  background:var(--panel);
+  color:var(--muted);
+  display:flex;align-items:center;justify-content:center;
+  cursor:pointer;
+  transition:all .2s;
+}
+.settings-btn:hover{border-color:var(--accent);color:var(--accent);background:var(--accent-dim)}
+.settings-btn svg{width:15px;height:15px}
 .dot{
   width:5px;height:5px;border-radius:50%;
   background:var(--red);
   box-shadow:0 0 6px var(--red);
   transition:background .3s,box-shadow .3s;
 }
-.dot.on{background:var(--accent);box-shadow:0 0 6px var(--accent-glow);animation:blink 2s infinite}
+.dot.on{background:var(--accent);box-shadow:0 0 6px var(--accent);animation:blink 2s infinite}
 @keyframes blink{0%,100%{opacity:1}50%{opacity:.5}}
 
 /* ── CONTENT ── */
-.content{padding:14px 16px}
+.content{padding:15px 17px 17px}
 
 /* URL bar */
 .url-row{display:flex;gap:6px;margin-bottom:12px}
@@ -98,29 +132,30 @@ body{
   background:var(--panel);
   border:1px solid var(--border2);
   border-radius:7px;
-  padding:8px 10px;
+  padding:9px 10px;
   font-family:var(--mono);
-  font-size:10px;
+  font-size:11px;
   color:var(--text);
   outline:none;
-  transition:border .2s;
+  transition:border .2s,box-shadow .2s;
   min-width:0;
 }
-#url-input:focus{border-color:var(--accent)}
+#url-input:focus{border-color:var(--accent);box-shadow:0 0 0 3px var(--accent-glow)}
 #url-input::placeholder{color:var(--muted)}
 #load-btn{
-  background:var(--panel2);
+  background:#fff;
   border:1px solid var(--border2);
   border-radius:7px;
-  padding:8px 12px;
+  padding:9px 12px;
   color:var(--text);
-  font-family:var(--mono);
-  font-size:10px;
+  font-family:var(--sans);
+  font-size:11px;
+  font-weight:700;
   cursor:pointer;
   transition:all .2s;
   white-space:nowrap;
 }
-#load-btn:hover{border-color:var(--accent);color:var(--accent)}
+#load-btn:hover{border-color:var(--accent);color:var(--accent);background:var(--accent-dim)}
 
 /* Video info */
 #video-info{
@@ -148,20 +183,21 @@ body{
 }
 .vmeta{padding:10px 12px 12px}
 .vtitle{
-  font-size:11px;font-weight:500;line-height:1.45;
+  font-size:12px;font-weight:700;line-height:1.5;
   color:var(--text);margin-bottom:6px;
-  display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;
+  display:-webkit-box;-webkit-line-clamp:2;line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;
 }
 .vmeta-row{display:flex;gap:12px;align-items:center}
 .vtag{
-  font-size:9px;color:var(--muted);
+  font-size:10px;color:var(--muted);
   display:flex;align-items:center;gap:3px;
 }
 
 /* Section label */
 .slabel{
-  font-size:9px;color:var(--muted);letter-spacing:0.12em;
+  font-size:12px;color:var(--text);
   text-transform:uppercase;margin-bottom:6px;
+  font-weight:700;
 }
 
 /* Format grid */
@@ -172,44 +208,31 @@ body{
   text-align:center;cursor:pointer;transition:all .15s;
 }
 .fmt-btn:hover{border-color:var(--accent);background:var(--accent-dim)}
-.fmt-btn.active{border-color:var(--accent);background:var(--accent-dim);box-shadow:0 0 10px var(--accent-glow)}
-.fmt-name{font-size:11px;font-weight:700;color:var(--muted)}
+.fmt-btn.active{border-color:var(--accent);background:var(--accent-dim);box-shadow:0 0 0 3px var(--accent-glow)}
+.fmt-name{font-size:12px;font-weight:800;color:var(--text)}
 .fmt-btn.active .fmt-name{color:var(--accent)}
-.fmt-type{font-size:8px;color:var(--muted);margin-top:2px}
+.fmt-type{font-size:10px;color:var(--muted);margin-top:2px}
 
 /* Quality */
 .q-row{display:flex;flex-wrap:wrap;gap:5px;margin-bottom:12px}
 .q-chip{
   background:var(--panel);border:1px solid var(--border);
-  border-radius:5px;padding:4px 8px;
-  font-size:9px;color:var(--muted);cursor:pointer;
+  border-radius:5px;padding:5px 8px;
+  font-size:11px;color:var(--text);cursor:pointer;
   transition:all .15s;
 }
-.q-chip:hover{color:var(--text);border-color:var(--border2)}
-.q-chip.active{background:var(--accent);border-color:var(--accent);color:#080c10;font-weight:700}
-
-/* Output dir */
-.dir-row{display:flex;gap:5px;margin-bottom:14px}
-#dir-input{
-  flex:1;
-  background:var(--panel);border:1px solid var(--border);
-  border-radius:6px;padding:7px 9px;
-  font-family:var(--mono);font-size:9px;color:var(--muted);
-  outline:none;min-width:0;
-}
-#dir-input:focus{border-color:var(--border2);color:var(--text)}
-.dir-label{font-size:9px;color:var(--muted);padding:7px 0;white-space:nowrap}
+.q-chip:hover{color:var(--accent);border-color:var(--accent);background:var(--accent-dim)}
+.q-chip.active{background:var(--accent);border-color:var(--accent);color:#fff;font-weight:700}
 
 /* Download btn */
 #dl-btn{
   width:100%;
-  background:linear-gradient(135deg,#00d084,#00b4ff);
+  background:linear-gradient(135deg,#087f5b,#0b65c2);
   border:none;border-radius:9px;
   padding:13px;
-  font-family:'Syne',sans-serif;
-  font-size:13px;font-weight:800;
-  letter-spacing:0.06em;
-  color:#080c10;
+  font-family:var(--sans);
+  font-size:14px;font-weight:800;
+  color:#fff;
   cursor:pointer;
   transition:all .2s;
   display:flex;align-items:center;justify-content:center;gap:8px;
@@ -231,9 +254,9 @@ body{
   border:1px solid var(--border);
   border-radius:8px;
   padding:10px;
-  font-size:9px;
+  font-size:11px;
   line-height:1.7;
-  color:var(--muted);
+  color:var(--text);
   max-height:90px;
   overflow-y:auto;
   display:none;
@@ -248,22 +271,22 @@ body{
 #srv-warn{
   margin-top:10px;
   padding:10px 12px;
-  background:var(--panel);
+  background:#fff8e6;
   border:1px solid var(--border);
   border-left:3px solid var(--yellow);
   border-radius:8px;
   display:none;
 }
 #srv-warn.show{display:block}
-#srv-warn p{font-size:9px;color:var(--muted);line-height:1.6}
+#srv-warn p{font-size:11px;color:var(--text);line-height:1.65}
 #srv-warn strong{color:var(--yellow)}
 
 /* Spinner */
 @keyframes spin{to{transform:rotate(360deg)}}
 .spin{
   display:inline-block;width:11px;height:11px;
-  border:2px solid rgba(8,12,16,.3);
-  border-top-color:#080c10;
+  border:2px solid rgba(255,255,255,.45);
+  border-top-color:#fff;
   border-radius:50%;animation:spin .5s linear infinite;
 }
 </style>
@@ -282,6 +305,9 @@ body{
     <div class="dot" id="srv-dot"></div>
     <span id="srv-label">確認中</span>
   </div>
+  <button class="settings-btn" id="settings-btn" title="設定を開く" aria-label="設定を開く">
+    <svg viewBox="0 0 24 24" fill="currentColor"><path d="M19.43 12.98c.04-.32.07-.65.07-.98s-.02-.66-.07-.98l2.11-1.65c.19-.15.24-.42.12-.64l-2-3.46c-.12-.22-.37-.31-.6-.22l-2.49 1a7.28 7.28 0 0 0-1.69-.98L14.5 2.42A.49.49 0 0 0 14 2h-4a.49.49 0 0 0-.49.42L9.13 5.07c-.6.23-1.16.56-1.69.98l-2.49-1a.5.5 0 0 0-.6.22l-2 3.46a.5.5 0 0 0 .12.64l2.11 1.65c-.04.32-.08.65-.08.98s.03.66.08.98l-2.11 1.65a.5.5 0 0 0-.12.64l2 3.46c.12.22.37.31.6.22l2.49-1c.52.4 1.08.73 1.69.98l.38 2.65c.04.24.25.42.49.42h4c.24 0 .45-.18.49-.42l.38-2.65c.6-.23 1.16-.56 1.69-.98l2.49 1c.23.08.48 0 .6-.22l2-3.46a.5.5 0 0 0-.12-.64l-2.11-1.65ZM12 15.5A3.5 3.5 0 1 1 12 8a3.5 3.5 0 0 1 0 7.5Z"/></svg>
+  </button>
 </div>
 
 <div class="content">
@@ -295,7 +321,7 @@ body{
   <!-- Video card -->
   <div id="video-info">
     <div class="thumb-row">
-      <img id="thumb" src="" alt="">
+      <img id="thumb" src="" alt="" width="366" height="206">
       <span class="dur" id="dur"></span>
     </div>
     <div class="vmeta">
@@ -331,12 +357,6 @@ body{
     </div>
   </div>
 
-  <!-- Output dir -->
-  <div class="slabel">保存先</div>
-  <div class="dir-row">
-    <input id="dir-input" type="text" placeholder="~/Downloads/yt-dlp">
-  </div>
-
   <!-- Download -->
   <button id="dl-btn" disabled>
     <svg viewBox="0 0 24 24" fill="currentColor"><path d="M19 9h-4V3H9v6H5l7 7 7-7zM5 18v2h14v-2H5z"/></svg>
@@ -350,11 +370,12 @@ body{
   <div id="srv-warn">
     <p><strong>⚡ サーバーが起動していません</strong><br>
     以下のコマンドでサーバーを起動してください:<br>
-    <code>python3 server/server.py</code></p>
+    <code>python3 server/server.py</code><br>
+    接続先: <code id="api-url-label">http://localhost:9876</code></p>
   </div>
 
 </div>
 
-<script src="popup.js"></script>
+<script src="popup.js" defer></script>
 </body>
 </html>

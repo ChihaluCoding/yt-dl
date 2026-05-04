@@ -6,13 +6,16 @@
   "permissions": [
     "activeTab",
     "scripting",
-    "tabs"
+    "tabs",
+    "storage"
   ],
   "host_permissions": [
     "https://www.youtube.com/*",
     "https://youtube.com/*",
-    "http://localhost:9876/*"
+    "http://localhost/*",
+    "http://127.0.0.1/*"
   ],
+  "options_page": "options.html",
   "action": {
     "default_popup": "popup.html",
     "default_icon": {
