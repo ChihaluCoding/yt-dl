@@ -41,14 +41,12 @@ body.large-text{
 }
 body.large-text #url-input,
 body.large-text #load-btn,
-body.large-text .meta-input,
-body.large-text .q-chip,
+body.large-text .select-control,
 body.large-text #log-box,
 body.large-text #srv-warn p{
   font-size:12px;
 }
 body.large-text .slabel,
-body.large-text .fmt-name,
 body.large-text .vtitle{
   font-size:13px;
 }
@@ -203,86 +201,35 @@ body.large-text #dl-btn{
   font-weight:700;
 }
 
-/* Format grid */
-.fmt-grid{display:grid;grid-template-columns:repeat(5,1fr);gap:5px;margin-bottom:12px}
-.fmt-btn{
-  background:var(--panel);border:1px solid var(--border);
-  border-radius:7px;padding:8px 4px;
-  text-align:center;cursor:pointer;transition:all .15s;
-}
-.fmt-btn:hover{border-color:var(--accent);background:var(--accent-dim)}
-.fmt-btn.active{border-color:var(--accent);background:var(--accent-dim);box-shadow:0 0 0 3px var(--accent-glow)}
-.fmt-name{font-size:12px;font-weight:800;color:var(--text)}
-.fmt-btn.active .fmt-name{color:var(--accent)}
-.fmt-type{font-size:10px;color:var(--muted);margin-top:2px}
-
-/* Quality */
-.q-row{display:flex;flex-wrap:wrap;gap:5px;margin-bottom:12px}
-.q-chip{
-  background:var(--panel);border:1px solid var(--border);
-  border-radius:5px;padding:5px 8px;
-  font-size:11px;color:var(--text);cursor:pointer;
-  transition:all .15s;
-}
-.q-chip:hover{color:var(--accent);border-color:var(--accent);background:var(--accent-dim)}
-.q-chip.active{background:var(--accent);border-color:var(--accent);color:#fff;font-weight:700}
-
-/* Metadata */
-.meta-panel{
-  margin-bottom:12px;
-  border:1px solid var(--border);
-  border-radius:8px;
-  background:var(--panel);
-  overflow:hidden;
-}
-.meta-panel summary{
-  padding:10px 11px;
-  cursor:pointer;
-  font-weight:800;
-  list-style:none;
-}
-.meta-panel summary::-webkit-details-marker{display:none}
-.meta-panel summary::after{
-  content:'+';
-  float:right;
-  color:var(--muted);
-}
-.meta-panel[open] summary{
-  border-bottom:1px solid var(--border);
-}
-.meta-panel[open] summary::after{content:'-'}
-.meta-fields{
+/* Download options */
+.option-grid{
   display:grid;
   grid-template-columns:1fr 1fr;
-  gap:9px;
-  padding:10px 11px 12px;
+  gap:8px;
+  margin-bottom:12px;
 }
-.meta-field.full{grid-column:1 / -1}
-.meta-label{
-  display:block;
-  margin-bottom:4px;
-  font-size:11px;
-  font-weight:700;
-  color:var(--text);
-}
-.meta-input{
+.select-field{min-width:0}
+.select-control{
   width:100%;
+  min-height:36px;
   border:1px solid var(--border2);
-  border-radius:6px;
-  background:#fff;
+  border-radius:7px;
+  background:var(--panel);
   color:var(--text);
   font-family:var(--sans);
-  font-size:11px;
-  padding:7px 8px;
+  font-size:12px;
+  font-weight:700;
+  padding:8px 9px;
   outline:none;
 }
-textarea.meta-input{
-  min-height:54px;
-  resize:vertical;
-}
-.meta-input:focus{
+.select-control:focus{
   border-color:var(--accent);
   box-shadow:0 0 0 3px var(--accent-glow);
+}
+.select-control:disabled{
+  background:var(--panel2);
+  color:var(--muted);
+  cursor:not-allowed;
 }
 
 /* Download btn */
@@ -324,6 +271,7 @@ textarea.meta-input{
   word-break:break-all;
 }
 #log-box.show{display:block}
+#log-box.log-disabled{display:none}
 .log-ok{color:var(--accent)}
 .log-err{color:var(--red)}
 .log-info{color:var(--blue)}
@@ -394,60 +342,31 @@ textarea.meta-input{
     </div>
   </div>
 
-  <!-- Format -->
-  <div class="slabel">フォーマット</div>
-  <div class="fmt-grid">
-    <div class="fmt-btn active" data-f="mp4"><div class="fmt-name">MP4</div><div class="fmt-type">動画</div></div>
-    <div class="fmt-btn" data-f="mov"><div class="fmt-name">MOV</div><div class="fmt-type">動画</div></div>
-    <div class="fmt-btn" data-f="webm"><div class="fmt-name">WebM</div><div class="fmt-type">動画</div></div>
-    <div class="fmt-btn" data-f="mp3"><div class="fmt-name">MP3</div><div class="fmt-type">音声</div></div>
-    <div class="fmt-btn" data-f="m4a"><div class="fmt-name">M4A</div><div class="fmt-type">音声</div></div>
+  <!-- Download options -->
+  <div class="option-grid">
+    <label class="select-field">
+      <span class="slabel">フォーマット</span>
+      <select class="select-control" id="format-select">
+        <option value="mp4">MP4 動画</option>
+        <option value="mov">MOV 動画</option>
+        <option value="webm">WebM 動画</option>
+        <option value="mp3">MP3 音声</option>
+        <option value="m4a">M4A 音声</option>
+      </select>
+    </label>
+    <label class="select-field">
+      <span class="slabel">画質</span>
+      <select class="select-control" id="quality-select">
+        <option value="360">360p</option>
+        <option value="480">480p</option>
+        <option value="720">720p HD</option>
+        <option value="1080">1080p FHD</option>
+        <option value="1440">1440p 2K</option>
+        <option value="2160">4K</option>
+        <option value="max">最高画質</option>
+      </select>
+    </label>
   </div>
-
-  <!-- Quality -->
-  <div id="q-section">
-    <div class="slabel">画質</div>
-    <div class="q-row">
-      <div class="q-chip" data-q="360">360p</div>
-      <div class="q-chip" data-q="480">480p</div>
-      <div class="q-chip active" data-q="720">720p HD</div>
-      <div class="q-chip" data-q="1080">1080p FHD</div>
-      <div class="q-chip" data-q="1440">1440p 2K</div>
-      <div class="q-chip" data-q="2160">4K</div>
-      <div class="q-chip" data-q="max">最高画質</div>
-    </div>
-  </div>
-
-  <!-- Metadata -->
-  <details class="meta-panel" id="meta-panel">
-    <summary>メタデータ編集</summary>
-    <div class="meta-fields">
-      <label class="meta-field full">
-        <span class="meta-label">タイトル</span>
-        <input class="meta-input" id="meta-title" type="text" autocomplete="off">
-      </label>
-      <label class="meta-field">
-        <span class="meta-label">アーティスト</span>
-        <input class="meta-input" id="meta-artist" type="text" autocomplete="off">
-      </label>
-      <label class="meta-field">
-        <span class="meta-label">アルバム</span>
-        <input class="meta-input" id="meta-album" type="text" autocomplete="off">
-      </label>
-      <label class="meta-field">
-        <span class="meta-label">ジャンル</span>
-        <input class="meta-input" id="meta-genre" type="text" autocomplete="off">
-      </label>
-      <label class="meta-field">
-        <span class="meta-label">日付</span>
-        <input class="meta-input" id="meta-date" type="text" inputmode="numeric" placeholder="2026">
-      </label>
-      <label class="meta-field full">
-        <span class="meta-label">コメント</span>
-        <textarea class="meta-input" id="meta-comment"></textarea>
-      </label>
-    </div>
-  </details>
 
   <!-- Download -->
   <button id="dl-btn" disabled>

@@ -23,9 +23,13 @@ from urllib.parse import urlparse, parse_qs, quote
 PORT = 9876
 HOST = "0.0.0.0"
 DEFAULT_DOWNLOAD_DIR = str(Path.home() / "Downloads" / "yt-dl")
+DEFAULT_COOKIES_FROM_BROWSER = "chrome"
+DEFAULT_JS_RUNTIMES = "deno"
+DEFAULT_REMOTE_COMPONENTS = "ejs:npm"
 DOWNLOAD_JOBS = {}
 DOWNLOAD_JOBS_LOCK = threading.Lock()
 JOB_TTL_SECONDS = 60 * 60
+YTDLP_EXTRA_ARGS = []
 
 # CORS headers for Chrome extension
 CORS_HEADERS = {
@@ -43,15 +47,24 @@ def check_ffmpeg():
     """ffmpegがインストールされているか確認"""
     return shutil.which("ffmpeg") is not None
 
+def check_deno():
+    """Denoがインストールされているか確認"""
+    return shutil.which("deno") is not None
+
 def get_video_info(url):
     """yt-dlpで動画情報を取得"""
     cmd = [
         "yt-dlp",
+        "--ignore-config",
+        *YTDLP_EXTRA_ARGS,
         "--dump-json",
         "--no-playlist",
         url
     ]
-    result = subprocess.run(cmd, capture_output=True, text=True, timeout=30)
+    try:
+        result = subprocess.run(cmd, capture_output=True, text=True, timeout=60)
+    except subprocess.TimeoutExpired:
+        raise Exception("動画情報の取得がタイムアウトしました。もう一度試すか、yt-dlpを更新してください。")
     if result.returncode != 0:
         raise Exception(result.stderr.strip() or "動画情報の取得に失敗しました")
     return json.loads(result.stdout)
@@ -61,7 +74,7 @@ def build_yt_dlp_command(url, fmt, quality, output_dir, metadata=None):
     os.makedirs(output_dir, exist_ok=True)
     output_template = os.path.join(output_dir, "%(title)s.%(ext)s")
 
-    cmd = ["yt-dlp", "--no-playlist", "--progress", "-o", output_template]
+    cmd = ["yt-dlp", "--ignore-config", *YTDLP_EXTRA_ARGS, "--no-playlist", "--progress", "-o", output_template]
 
     audio_only_formats = {"mp3", "m4a", "aac", "opus", "flac"}
 
@@ -269,6 +282,7 @@ class Handler(http.server.BaseHTTPRequestHandler):
                 "status": "ok",
                 "ytdlp": check_ytdlp(),
                 "ffmpeg": check_ffmpeg(),
+                "deno": check_deno(),
                 "version": get_ytdlp_version()
             })
 
@@ -472,10 +486,49 @@ def parse_args():
         default=int(os.environ.get("YT_DLP_PORT", PORT)),
         help=f"待受ポート（既定値: {PORT}）",
     )
+    parser.add_argument(
+        "--cookies-from-browser",
+        default=os.environ.get("YT_DLP_COOKIES_FROM_BROWSER", DEFAULT_COOKIES_FROM_BROWSER),
+        help="YouTubeのBot判定対策に使うブラウザCookie。例: chrome, firefox, edge, safari",
+    )
+    parser.add_argument(
+        "--no-cookies-from-browser",
+        action="store_true",
+        help="ブラウザCookieを使わずに起動",
+    )
+    parser.add_argument(
+        "--cookies",
+        default=os.environ.get("YT_DLP_COOKIES", ""),
+        help="yt-dlpに渡すcookies.txtのパス",
+    )
+    parser.add_argument(
+        "--js-runtimes",
+        default=os.environ.get("YT_DLP_JS_RUNTIMES", DEFAULT_JS_RUNTIMES),
+        help="yt-dlpに渡すJavaScriptランタイム。例: deno, node",
+    )
+    parser.add_argument(
+        "--remote-components",
+        default=os.environ.get("YT_DLP_REMOTE_COMPONENTS", DEFAULT_REMOTE_COMPONENTS),
+        help="yt-dlpに渡すリモートコンポーネント。例: ejs:npm, ejs:github",
+    )
     return parser.parse_args()
 
 
+def build_ytdlp_extra_args(args):
+    extra = []
+    if args.cookies_from_browser and not args.no_cookies_from_browser:
+        extra += ["--cookies-from-browser", args.cookies_from_browser]
+    if args.cookies:
+        extra += ["--cookies", args.cookies]
+    if args.js_runtimes:
+        extra += ["--js-runtimes", args.js_runtimes]
+    if args.remote_components:
+        extra += ["--remote-components", args.remote_components]
+    return extra
+
+
 def main():
+    global YTDLP_EXTRA_ARGS
     args = parse_args()
 
     if not check_ytdlp():
@@ -485,9 +538,18 @@ def main():
         sys.exit(1)
 
     lan_ip = get_lan_ip()
+    YTDLP_EXTRA_ARGS = build_ytdlp_extra_args(args)
 
     print(f"✅ yt-dlp version: {get_ytdlp_version()}")
     print(f"📁 サーバー直接保存先: {DEFAULT_DOWNLOAD_DIR}")
+    if args.cookies_from_browser and not args.no_cookies_from_browser:
+        print(f"🍪 Cookie: {args.cookies_from_browser} から読み込み")
+    if args.cookies:
+        print(f"🍪 Cookie file: {args.cookies}")
+    if args.js_runtimes:
+        print(f"🧩 JS runtime: {args.js_runtimes}")
+    if args.remote_components:
+        print(f"🧩 Remote components: {args.remote_components}")
     print(f"🚀 サーバー起動中: http://localhost:{args.port}")
     if args.host in {"0.0.0.0", ""} and lan_ip:
         print(f"🌐 同じWi-Fiの別PCから: http://{lan_ip}:{args.port}")

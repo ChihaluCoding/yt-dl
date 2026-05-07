@@ -1,2 +1,6 @@
 /.DS_Store
 /.lh
+.DS_Store
+docs/
+.lh/
+AGENTS.md
