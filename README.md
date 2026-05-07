@@ -7,7 +7,7 @@ YouTubeの動画をyt-dlpでダウンロードするChrome拡張機能です。
 ```
 yt-dlp-suite/
 ├── server/
-│   └── server.py        ← Pythonローカルサーバー（localhost:9876）
+│   └── server.py        ← Pythonローカル/LANサーバー（localhost:9876）
 └── extension/
     ├── manifest.json
     ├── popup.html
@@ -42,8 +42,9 @@ python3 server/server.py
 起動すると以下のように表示されます：
 ```
 ✅ yt-dlp version: 2026.xx.xx
-📁 デフォルト保存先: ~/Downloads/yt-dl ※変えたい場合は拡張機能の設定画面から変更できます※
+📁 サーバー直接保存先: ~/Downloads/yt-dl
 🚀 サーバー起動中: http://localhost:9876
+🌐 同じWi-Fiの別PCから: http://192.168.x.x:9876
 ```
 
 ### 3. Chrome拡張機能をインストール
@@ -72,7 +73,6 @@ python3 server/server.py
 設定画面では以下を変更できます。
 
 - ローカルサーバーURL
-- 既定の保存先
 - 既定フォーマット
 - 既定画質
 - YouTubeページでの自動情報取得
@@ -80,11 +80,21 @@ python3 server/server.py
 
 ポップアップの「メタデータ編集」では、ダウンロードするファイルに埋め込むタイトル、アーティスト、アルバム、ジャンル、日付、コメントを編集できます。
 
+### 同じWi-Fiの別PCから使う
+
+1. ダウンロードを実行するPCで `python3 server/server.py` を起動します
+2. 起動ログの `🌐 同じWi-Fiの別PCから: http://192.168.x.x:9876` を確認します
+3. 別PCのChromeにも `extension/` を読み込みます
+4. 拡張機能の設定画面で「ローカルサーバーURL」に手順2のURLを入力して保存します
+
+ファイルは操作しているChromeの通常のダウンロード先に保存されます。サーバー側には変換用の一時ファイルだけを作り、ブラウザへ転送後に削除します。macOS/WindowsのファイアウォールでPythonの受信接続を許可する必要がある場合があります。
+
 ---
 
 ## 注意事項
 
-- サーバーはlocalhost専用のため、外部からはアクセスできません
+- サーバーは既定で同じLAN内に公開されます。信頼できるWi-Fi内だけで使ってください
+- localhost専用に戻したい場合は `python3 server/server.py --host 127.0.0.1` で起動してください
 
 ---
 

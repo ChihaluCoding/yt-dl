@@ -12,11 +12,20 @@ import sys
 import os
 import threading
 import shutil
+import argparse
+import socket
+import tempfile
+import time
+import uuid
 from pathlib import Path
-from urllib.parse import urlparse, parse_qs
+from urllib.parse import urlparse, parse_qs, quote
 
 PORT = 9876
+HOST = "0.0.0.0"
 DEFAULT_DOWNLOAD_DIR = str(Path.home() / "Downloads" / "yt-dl")
+DOWNLOAD_JOBS = {}
+DOWNLOAD_JOBS_LOCK = threading.Lock()
+JOB_TTL_SECONDS = 60 * 60
 
 # CORS headers for Chrome extension
 CORS_HEADERS = {
@@ -29,6 +38,10 @@ CORS_HEADERS = {
 def check_ytdlp():
     """yt-dlpがインストールされているか確認"""
     return shutil.which("yt-dlp") is not None
+
+def check_ffmpeg():
+    """ffmpegがインストールされているか確認"""
+    return shutil.which("ffmpeg") is not None
 
 def get_video_info(url):
     """yt-dlpで動画情報を取得"""
@@ -53,14 +66,22 @@ def build_yt_dlp_command(url, fmt, quality, output_dir, metadata=None):
     audio_only_formats = {"mp3", "m4a", "aac", "opus", "flac"}
 
     if fmt in audio_only_formats:
+        audio_selector = "bestaudio[ext=m4a]/bestaudio[ext=webm]/bestaudio"
+        if fmt != "m4a":
+            audio_selector = "bestaudio[ext=webm]/bestaudio[ext=m4a]/bestaudio"
+
         cmd += [
             "-x",
             "--audio-format", fmt,
             "--audio-quality", "0",  # best
-            # webpサムネイルが残らないよう jpg に変換して埋め込む
+            "--prefer-ffmpeg",
+            "-f", audio_selector,
+            # サムネイルをjpgに変換して埋め込み、元ファイルを残さない
             "--embed-thumbnail",
             "--convert-thumbnails", "jpg",
             "--ppa", "ThumbnailsConvertor:-q:v 2",
+            # 中間ファイル（.webp, .webm等）を残さない
+            "--no-keep-video",
         ]
         metadata_args = build_metadata_args(metadata or {})
         if metadata_args:
@@ -110,38 +131,88 @@ def build_yt_dlp_command(url, fmt, quality, output_dir, metadata=None):
     return cmd
 
 
+def set_job(job_id, **updates):
+    with DOWNLOAD_JOBS_LOCK:
+        job = DOWNLOAD_JOBS.get(job_id, {})
+        job.update(updates)
+        job["updatedAt"] = time.time()
+        DOWNLOAD_JOBS[job_id] = job
+        return dict(job)
+
+
+def get_job(job_id):
+    with DOWNLOAD_JOBS_LOCK:
+        job = DOWNLOAD_JOBS.get(job_id)
+        return dict(job) if job else None
+
+
+def cleanup_job(job_id):
+    with DOWNLOAD_JOBS_LOCK:
+        job = DOWNLOAD_JOBS.pop(job_id, None)
+    if not job:
+        return
+    temp_dir = job.get("tempDir")
+    if temp_dir:
+        shutil.rmtree(temp_dir, ignore_errors=True)
+
+
+def cleanup_old_jobs():
+    now = time.time()
+    stale_ids = []
+    with DOWNLOAD_JOBS_LOCK:
+        for job_id, job in DOWNLOAD_JOBS.items():
+            if now - job.get("updatedAt", now) > JOB_TTL_SECONDS:
+                stale_ids.append(job_id)
+    for job_id in stale_ids:
+        cleanup_job(job_id)
+
+
+def find_downloaded_file(output_dir):
+    files = [
+        p for p in Path(output_dir).glob("*")
+        if p.is_file() and not p.name.endswith((".part", ".ytdl", ".temp", ".tmp"))
+    ]
+    if not files:
+        return None
+    return max(files, key=lambda p: (p.stat().st_mtime, p.stat().st_size))
+
+
 def build_metadata_args(metadata):
-    """編集されたメタデータをyt-dlpの埋め込み設定に変換"""
+    """編集されたメタデータをyt-dlpの埋め込み設定に変換。
+    --postprocessor-args でffmpegに -metadata を直接渡すのが最も確実。
+    """
     field_map = [
-        ("title", ("title",)),
-        ("artist", ("artist", "album_artist")),
-        ("album", ("album",)),
-        ("genre", ("genre",)),
-        ("date", ("date",)),
-        ("comment", ("comment",)),
+        ("title",   "title"),
+        ("artist",  "artist"),
+        ("album",   "album"),
+        ("genre",   "genre"),
+        ("date",    "date"),
+        ("comment", "comment"),
     ]
-    args = [
-        "--replace-in-metadata",
-        "artist,artists,creator,creators,album,album_artist",
-        r"^(?i:na|n/a|none|unknown|null|-)$",
-        "",
-    ]
+
+    ffmpeg_args = []
     has_custom_metadata = False
 
-    for request_key, metadata_keys in field_map:
+    for request_key, ffmpeg_tag in field_map:
         value = normalize_metadata_value(metadata.get(request_key, ""))
         if not value:
             continue
         has_custom_metadata = True
-        for metadata_key in metadata_keys:
-            args += [
-                "--parse-metadata",
-                f"{escape_metadata_template(value)}:%(meta_{metadata_key})s",
-            ]
+        ffmpeg_args += ["-metadata", f"{ffmpeg_tag}={value}"]
 
     if not has_custom_metadata:
         return []
-    return ["--embed-metadata", "--no-embed-info-json", *args]
+
+    # --postprocessor-args はスペース区切りで引数を渡す
+    # 値にスペースが含まれる場合があるため、各トークンをシェルエスケープする
+    import shlex
+    ppa_tokens = " ".join(shlex.quote(a) for a in ffmpeg_args)
+
+    return [
+        "--embed-metadata",
+        "--no-embed-info-json",
+        "--postprocessor-args", f"FFmpegMetadata:{ppa_tokens}",
+    ]
 
 
 def normalize_metadata_value(value):
@@ -169,6 +240,21 @@ class Handler(http.server.BaseHTTPRequestHandler):
         self.end_headers()
         self.wfile.write(body)
 
+    def send_file(self, file_path, filename):
+        safe_filename = filename.replace("\r", "").replace("\n", "")
+        encoded_filename = quote(safe_filename)
+        self.send_response(200)
+        self.send_header("Access-Control-Allow-Origin", "*")
+        self.send_header("Content-Type", "application/octet-stream")
+        self.send_header("Content-Length", str(os.path.getsize(file_path)))
+        self.send_header(
+            "Content-Disposition",
+            f"attachment; filename*=UTF-8''{encoded_filename}"
+        )
+        self.end_headers()
+        with open(file_path, "rb") as f:
+            shutil.copyfileobj(f, self.wfile)
+
     def do_OPTIONS(self):
         self.send_response(200)
         for k, v in CORS_HEADERS.items():
@@ -182,6 +268,7 @@ class Handler(http.server.BaseHTTPRequestHandler):
             self.send_json(200, {
                 "status": "ok",
                 "ytdlp": check_ytdlp(),
+                "ffmpeg": check_ffmpeg(),
                 "version": get_ytdlp_version()
             })
 
@@ -209,13 +296,44 @@ class Handler(http.server.BaseHTTPRequestHandler):
                 })
             except Exception as e:
                 self.send_json(500, {"error": str(e)})
+        elif parsed.path == "/job":
+            qs = parse_qs(parsed.query)
+            job_id = qs.get("id", [None])[0]
+            job = get_job(job_id) if job_id else None
+            if not job:
+                self.send_json(404, {"error": "job not found"})
+                return
+            self.send_json(200, {
+                "status": job.get("status"),
+                "filename": job.get("filename"),
+                "error": job.get("error"),
+                "returnCode": job.get("returnCode"),
+            })
+        elif parsed.path == "/file":
+            qs = parse_qs(parsed.query)
+            job_id = qs.get("id", [None])[0]
+            job = get_job(job_id) if job_id else None
+            if not job:
+                self.send_json(404, {"error": "job not found"})
+                return
+            if job.get("status") != "done" or not job.get("filePath"):
+                self.send_json(409, {"error": "file is not ready"})
+                return
+            file_path = job["filePath"]
+            if not os.path.isfile(file_path):
+                self.send_json(404, {"error": "file not found"})
+                return
+            try:
+                self.send_file(file_path, job.get("filename") or os.path.basename(file_path))
+            finally:
+                threading.Timer(30, cleanup_job, args=[job_id]).start()
         else:
             self.send_json(404, {"error": "not found"})
 
     def do_POST(self):
         parsed = urlparse(self.path)
 
-        if parsed.path == "/download":
+        if parsed.path in {"/download", "/prepare-download"}:
             length = int(self.headers.get("Content-Length", 0))
             body = self.rfile.read(length)
             try:
@@ -234,6 +352,54 @@ class Handler(http.server.BaseHTTPRequestHandler):
 
             if not url:
                 self.send_json(400, {"error": "url is required"})
+                return
+            if fmt in {"mp3", "aac", "opus", "flac"} and not check_ffmpeg():
+                self.send_json(500, {"error": f"{fmt}への変換にはffmpegが必要です"})
+                return
+
+            if parsed.path == "/prepare-download":
+                cleanup_old_jobs()
+                job_id = uuid.uuid4().hex
+                temp_dir = tempfile.mkdtemp(prefix="yt-dlp-suite-")
+                set_job(job_id, status="running", tempDir=temp_dir)
+                self.send_json(200, {"status": "started", "jobId": job_id})
+
+                def run_for_browser_download():
+                    try:
+                        cmd = build_yt_dlp_command(url, fmt, quality, temp_dir, metadata)
+                        print(f"\n[yt-dlp] Running for browser download: {' '.join(cmd)}\n")
+                        proc = subprocess.Popen(
+                            cmd,
+                            stdout=subprocess.PIPE,
+                            stderr=subprocess.STDOUT,
+                            text=True
+                        )
+                        for line in proc.stdout:
+                            print(line, end="")
+                        proc.wait()
+                        if proc.returncode != 0:
+                            set_job(job_id, status="error", returnCode=proc.returncode, error=f"yt-dlp failed with code {proc.returncode}")
+                            print(f"\n❌ ダウンロード失敗 (code {proc.returncode})")
+                            return
+                        file_path = find_downloaded_file(temp_dir)
+                        if not file_path:
+                            set_job(job_id, status="error", error="downloaded file not found")
+                            print("\n❌ ダウンロードファイルが見つかりません")
+                            return
+                        set_job(
+                            job_id,
+                            status="done",
+                            filePath=str(file_path),
+                            filename=file_path.name,
+                            returnCode=0,
+                        )
+                        print(f"\n✅ ブラウザ転送準備完了: {file_path.name}")
+                    except Exception as e:
+                        set_job(job_id, status="error", error=str(e))
+                        print(f"\n❌ ダウンロード失敗: {e}")
+
+                t = threading.Thread(target=run_for_browser_download, daemon=True)
+                t.start()
                 return
 
             # Run download in background thread
@@ -283,19 +449,52 @@ def get_ytdlp_version():
         return "unknown"
 
 
+def get_lan_ip():
+    """Return the best-effort LAN IP used for outbound traffic."""
+    try:
+        with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as s:
+            s.connect(("8.8.8.8", 80))
+            return s.getsockname()[0]
+    except Exception:
+        return None
+
+
+def parse_args():
+    parser = argparse.ArgumentParser(description="YT-DLP local/LAN server")
+    parser.add_argument(
+        "--host",
+        default=os.environ.get("YT_DLP_HOST", HOST),
+        help="待受ホスト。LAN内PCから接続する場合は 0.0.0.0（既定値）",
+    )
+    parser.add_argument(
+        "--port",
+        type=int,
+        default=int(os.environ.get("YT_DLP_PORT", PORT)),
+        help=f"待受ポート（既定値: {PORT}）",
+    )
+    return parser.parse_args()
+
+
 def main():
+    args = parse_args()
+
     if not check_ytdlp():
         print("❌ yt-dlpが見つかりません。インストールしてください:")
         print("   pip install yt-dlp")
         print("   または: brew install yt-dlp  (macOS)")
         sys.exit(1)
 
-    print(f"✅ yt-dlp version: {get_ytdlp_version()}")
-    print(f"📁 デフォルト保存先: {DEFAULT_DOWNLOAD_DIR}")
-    print(f"🚀 サーバー起動中: http://localhost:{PORT}")
-    print("   Chrome拡張機能から接続できます。Ctrl+Cで停止。\n")
+    lan_ip = get_lan_ip()
 
-    server = http.server.ThreadingHTTPServer(("localhost", PORT), Handler)
+    print(f"✅ yt-dlp version: {get_ytdlp_version()}")
+    print(f"📁 サーバー直接保存先: {DEFAULT_DOWNLOAD_DIR}")
+    print(f"🚀 サーバー起動中: http://localhost:{args.port}")
+    if args.host in {"0.0.0.0", ""} and lan_ip:
+        print(f"🌐 同じWi-Fiの別PCから: http://{lan_ip}:{args.port}")
+    print("   Chrome拡張機能から接続できます。Ctrl+Cで停止。")
+    print("   ※ LAN公開中は同じネットワーク上の端末からアクセスできます。\n")
+
+    server = http.server.ThreadingHTTPServer((args.host, args.port), Handler)
     try:
         server.serve_forever()
     except KeyboardInterrupt:

@@ -1,6 +1,5 @@
 const DEFAULT_SETTINGS = {
   apiBase: 'http://localhost:9876',
-  outputDir: '',
   format: 'mp4',
   quality: '720',
   autoLoadInfo: true,
@@ -144,19 +143,16 @@ dlBtn.addEventListener('click', async () => {
   if (!serverOnline) { await checkServer(); return; }
 
   dlBtn.disabled = true;
-  dlBtn.innerHTML = '<span class="spin"></span> 送信中...';
-
-  const outputDir = settings.outputDir.trim();
+  dlBtn.innerHTML = '<span class="spin"></span> 準備中...';
 
   try {
-    const r = await fetch(`${settings.apiBase}/download`, {
+    const r = await fetch(`${settings.apiBase}/prepare-download`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         url: currentUrl,
         format: selectedFormat,
         quality: selectedQuality,
-        outputDir: outputDir || undefined,
         metadata: readMetadata()
       }),
       signal: AbortSignal.timeout(10000)
@@ -164,9 +160,13 @@ dlBtn.addEventListener('click', async () => {
     const d = await r.json();
     if (d.error) throw new Error(d.error);
 
-    log(`✔ ダウンロード開始！`, 'ok');
-    log(`📁 保存先: ${d.outputDir}`, 'info');
-    log('   ターミナルで進捗を確認してください', 'info');
+    log('✔ サーバーで変換を開始しました', 'ok');
+    log('   完了後、このPCのChromeダウンロードに保存します', 'info');
+
+    const job = await waitForPreparedDownload(d.jobId);
+    const downloadUrl = `${settings.apiBase}/file?id=${encodeURIComponent(d.jobId)}`;
+    await startChromeDownload(downloadUrl, job.filename);
+    log(`✔ Chromeのダウンロードに追加しました: ${job.filename || 'ファイル'}`, 'ok');
   } catch (e) {
     log(`✘ エラー: ${e.message}`, 'err');
   }
@@ -265,6 +265,51 @@ function fmtDur(sec) {
   const s = sec % 60;
   if (h > 0) return `${h}:${String(m).padStart(2,'0')}:${String(s).padStart(2,'0')}`;
   return `${m}:${String(s).padStart(2,'0')}`;
+}
+
+async function waitForPreparedDownload(jobId) {
+  const startedAt = Date.now();
+  while (Date.now() - startedAt < 30 * 60 * 1000) {
+    const r = await fetch(`${settings.apiBase}/job?id=${encodeURIComponent(jobId)}`, {
+      signal: AbortSignal.timeout(5000)
+    });
+    const job = await r.json();
+    if (job.error) throw new Error(job.error);
+    if (job.status === 'done') return job;
+    if (job.status === 'error') throw new Error(job.error || 'ダウンロードに失敗しました');
+    await sleep(2000);
+  }
+  throw new Error('ダウンロード準備がタイムアウトしました');
+}
+
+function startChromeDownload(url, filename) {
+  const options = {
+    url,
+    conflictAction: 'uniquify',
+    saveAs: false
+  };
+  const safeName = safeDownloadFilename(filename);
+  if (safeName) options.filename = safeName;
+
+  return new Promise((resolve, reject) => {
+    chrome.downloads.download(options, downloadId => {
+      const err = chrome.runtime.lastError;
+      if (err) {
+        reject(new Error(err.message));
+        return;
+      }
+      resolve(downloadId);
+    });
+  });
+}
+
+function safeDownloadFilename(filename) {
+  if (!filename || typeof filename !== 'string') return '';
+  return filename.replace(/[\\/:*?"<>|]/g, '_').replace(/^\.+/, '').trim().slice(0, 240);
+}
+
+function sleep(ms) {
+  return new Promise(resolve => setTimeout(resolve, ms));
 }
 
 function log(msg, type = '') {

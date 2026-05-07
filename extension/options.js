@@ -1,6 +1,5 @@
 const DEFAULT_SETTINGS = {
   apiBase: 'http://localhost:9876',
-  outputDir: '',
   format: 'mp4',
   quality: '720',
   autoLoadInfo: true,
@@ -9,7 +8,6 @@ const DEFAULT_SETTINGS = {
 
 const form = document.getElementById('settings-form');
 const apiBase = document.getElementById('api-base');
-const outputDir = document.getElementById('output-dir');
 const format = document.getElementById('format');
 const quality = document.getElementById('quality');
 const autoLoadInfo = document.getElementById('auto-load-info');
@@ -31,7 +29,6 @@ async function save(event) {
 
   const next = {
     apiBase: normalizeApiBase(apiBase.value),
-    outputDir: outputDir.value.trim(),
     format: format.value,
     quality: quality.value,
     autoLoadInfo: autoLoadInfo.checked,
@@ -68,7 +65,6 @@ function getSettings() {
 
 function applyToForm(settings) {
   apiBase.value = settings.apiBase;
-  outputDir.value = settings.outputDir;
   format.value = settings.format;
   quality.value = settings.quality;
   autoLoadInfo.checked = settings.autoLoadInfo;
@@ -91,8 +87,8 @@ function validate(settings) {
     return 'ローカルサーバーURLは http:// で始めてください。';
   }
 
-  if (!['localhost', '127.0.0.1'].includes(parsed.hostname)) {
-    return '接続先は localhost または 127.0.0.1 にしてください。';
+  if (!isAllowedHost(parsed.hostname)) {
+    return '接続先は localhost、127.0.0.1、または同じWi-Fi内のサーバーIPにしてください。';
   }
 
   if (!parsed.port) {
@@ -100,6 +96,14 @@ function validate(settings) {
   }
 
   return '';
+}
+
+function isAllowedHost(hostname) {
+  if (['localhost', '127.0.0.1'].includes(hostname)) {
+    return true;
+  }
+
+  return /^(10\.\d{1,3}\.\d{1,3}\.\d{1,3}|172\.(1[6-9]|2\d|3[0-1])\.\d{1,3}\.\d{1,3}|192\.168\.\d{1,3}\.\d{1,3})$/.test(hostname);
 }
 
 function setStatus(message, type) {

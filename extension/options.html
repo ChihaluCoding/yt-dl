@@ -175,17 +175,13 @@ button:hover{border-color:var(--accent);color:var(--accent);background:var(--acc
       <div class="field">
         <label for="api-base">ローカルサーバーURL</label>
         <input id="api-base" type="url" inputmode="url" value="http://localhost:9876" placeholder="http://localhost:9876">
-        <div class="hint">Chrome拡張の権限は localhost / 127.0.0.1 向けに設定しています。</div>
+        <div class="hint">別PCから使う場合は、サーバー起動時に表示される http://192.168.x.x:9876 のようなURLを入力します。</div>
       </div>
     </section>
 
     <section class="section">
       <h2>ダウンロード</h2>
       <div class="grid">
-        <div class="field">
-          <label for="output-dir">既定の保存先</label>
-          <input id="output-dir" type="text" placeholder="~/Downloads/yt-dl">
-        </div>
         <div class="field">
           <label for="format">既定フォーマット</label>
           <select id="format">
