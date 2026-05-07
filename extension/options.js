@@ -3,6 +3,7 @@ const DEFAULT_SETTINGS = {
   format: 'mp4',
   quality: '720',
   autoLoadInfo: true,
+  showLog: true,
   textSize: 'normal'
 };
 
@@ -11,6 +12,7 @@ const apiBase = document.getElementById('api-base');
 const format = document.getElementById('format');
 const quality = document.getElementById('quality');
 const autoLoadInfo = document.getElementById('auto-load-info');
+const showLog = document.getElementById('show-log');
 const textSize = document.getElementById('text-size');
 const resetBtn = document.getElementById('reset-btn');
 const statusEl = document.getElementById('status');
@@ -32,6 +34,7 @@ async function save(event) {
     format: format.value,
     quality: quality.value,
     autoLoadInfo: autoLoadInfo.checked,
+    showLog: showLog.checked,
     textSize: textSize.value
   };
 
@@ -68,6 +71,7 @@ function applyToForm(settings) {
   format.value = settings.format;
   quality.value = settings.quality;
   autoLoadInfo.checked = settings.autoLoadInfo;
+  showLog.checked = settings.showLog;
   textSize.value = settings.textSize;
 }
 

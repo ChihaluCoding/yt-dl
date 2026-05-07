@@ -3,6 +3,7 @@ const DEFAULT_SETTINGS = {
   format: 'mp4',
   quality: '720',
   autoLoadInfo: true,
+  showLog: true,
   textSize: 'normal'
 };
 
@@ -23,14 +24,9 @@ const srvLabel = document.getElementById('srv-label');
 const srvPill  = document.getElementById('srv-pill');
 const settingsBtn = document.getElementById('settings-btn');
 const videoInfo = document.getElementById('video-info');
-const qSection  = document.getElementById('q-section');
 const apiUrlLabel = document.getElementById('api-url-label');
-const metaTitle = document.getElementById('meta-title');
-const metaArtist = document.getElementById('meta-artist');
-const metaAlbum = document.getElementById('meta-album');
-const metaGenre = document.getElementById('meta-genre');
-const metaDate = document.getElementById('meta-date');
-const metaComment = document.getElementById('meta-comment');
+const formatSelect = document.getElementById('format-select');
+const qualitySelect = document.getElementById('quality-select');
 
 // ── Init ──────────────────────────────────────────────
 document.addEventListener('DOMContentLoaded', async () => {
@@ -71,23 +67,13 @@ async function checkServer() {
 srvPill.addEventListener('click', () => checkServer());
 settingsBtn.addEventListener('click', () => chrome.runtime.openOptionsPage());
 
-// ── Format ────────────────────────────────────────────
-document.querySelectorAll('.fmt-btn').forEach(b => {
-  b.addEventListener('click', () => {
-    document.querySelectorAll('.fmt-btn').forEach(x => x.classList.remove('active'));
-    b.classList.add('active');
-    selectedFormat = b.dataset.f;
-    qSection.style.display = ['mp3','m4a'].includes(selectedFormat) ? 'none' : 'block';
-  });
+formatSelect.addEventListener('change', () => {
+  selectedFormat = formatSelect.value;
+  updateQualityState();
 });
 
-// ── Quality ───────────────────────────────────────────
-document.querySelectorAll('.q-chip').forEach(c => {
-  c.addEventListener('click', () => {
-    document.querySelectorAll('.q-chip').forEach(x => x.classList.remove('active'));
-    c.classList.add('active');
-    selectedQuality = c.dataset.q;
-  });
+qualitySelect.addEventListener('change', () => {
+  selectedQuality = qualitySelect.value;
 });
 
 // ── Load info ─────────────────────────────────────────
@@ -111,10 +97,9 @@ async function loadInfo(url) {
 
   try {
     const r = await fetch(`${settings.apiBase}/info?url=${encodeURIComponent(url)}`, {
-      signal: AbortSignal.timeout(30000)
+      signal: AbortSignal.timeout(70000)
     });
-    if (!r.ok) throw new Error(`HTTP ${r.status}`);
-    const d = await r.json();
+    const d = await readJsonResponse(r);
     if (d.error) throw new Error(d.error);
 
     // Display card
@@ -126,13 +111,12 @@ async function loadInfo(url) {
       : '';
     document.getElementById('dur').textContent = fmtDur(d.duration || 0);
     currentInfo = d;
-    applyInfoToMetadata(d);
 
     videoInfo.classList.add('show');
     dlBtn.disabled = false;
     log(`✔ "${d.title}"`, 'ok');
   } catch (e) {
-    log(`✘ 情報取得失敗: ${e.message}`, 'err');
+    log(`✘ 情報取得失敗: ${formatYtdlpError(e.message)}`, 'err');
   }
   loadBtn.disabled = false;
 }
@@ -152,8 +136,7 @@ dlBtn.addEventListener('click', async () => {
       body: JSON.stringify({
         url: currentUrl,
         format: selectedFormat,
-        quality: selectedQuality,
-        metadata: readMetadata()
+        quality: selectedQuality
       }),
       signal: AbortSignal.timeout(10000)
     });
@@ -193,61 +176,19 @@ function applySettings(nextSettings) {
   selectedQuality = nextSettings.quality;
   apiUrlLabel.textContent = nextSettings.apiBase;
   document.body.classList.toggle('large-text', nextSettings.textSize === 'large');
-  setActiveByData('.fmt-btn', 'f', selectedFormat);
-  setActiveByData('.q-chip', 'q', selectedQuality);
-  qSection.style.display = ['mp3','m4a'].includes(selectedFormat) ? 'none' : 'block';
+  logBox.classList.toggle('log-disabled', !nextSettings.showLog);
+  formatSelect.value = selectedFormat;
+  qualitySelect.value = selectedQuality;
+  updateQualityState();
 }
 
-function setActiveByData(selector, key, value) {
-  document.querySelectorAll(selector).forEach(el => {
-    el.classList.toggle('active', el.dataset[key] === value);
-  });
+function updateQualityState() {
+  const audioOnly = ['mp3', 'm4a'].includes(selectedFormat);
+  qualitySelect.disabled = audioOnly;
 }
 
 function normalizeApiBase(value) {
   return String(value || DEFAULT_SETTINGS.apiBase).replace(/\/+$/, '');
-}
-
-function applyInfoToMetadata(info) {
-  metaTitle.value = info.title || '';
-  metaArtist.value = firstText(info.artist, info.artists, info.creator, info.creators, info.uploader);
-  metaAlbum.value = '';
-  metaGenre.value = '';
-  metaDate.value = formatUploadDate(info.upload_date || '');
-  metaComment.value = info.description || '';
-}
-
-function readMetadata() {
-  return {
-    title: metaTitle.value.trim(),
-    artist: metaArtist.value.trim(),
-    album: metaAlbum.value.trim(),
-    genre: metaGenre.value.trim(),
-    date: metaDate.value.trim(),
-    comment: metaComment.value.trim()
-  };
-}
-
-function formatUploadDate(value) {
-  if (!/^\d{8}$/.test(value)) return '';
-  return `${value.slice(0, 4)}-${value.slice(4, 6)}-${value.slice(6)}`;
-}
-
-function firstText(...values) {
-  for (const value of values) {
-    if (Array.isArray(value) && value.length) {
-      const text = value.filter(isUsefulMetadataText).join(', ');
-      if (text) return text;
-    }
-    if (isUsefulMetadataText(value)) return value.trim();
-  }
-  return '';
-}
-
-function isUsefulMetadataText(value) {
-  if (typeof value !== 'string') return false;
-  const text = value.trim();
-  return text && !['na', 'n/a', 'none', 'unknown', 'null', '-'].includes(text.toLowerCase());
 }
 
 function isYtUrl(url) {
@@ -265,6 +206,33 @@ function fmtDur(sec) {
   const s = sec % 60;
   if (h > 0) return `${h}:${String(m).padStart(2,'0')}:${String(s).padStart(2,'0')}`;
   return `${m}:${String(s).padStart(2,'0')}`;
+}
+
+async function readJsonResponse(response) {
+  let data = {};
+  try {
+    data = await response.json();
+  } catch {
+    data = {};
+  }
+  if (!response.ok) {
+    throw new Error(data.error || `HTTP ${response.status}`);
+  }
+  return data;
+}
+
+function formatYtdlpError(message) {
+  const text = String(message || '');
+  if (text.includes('Sign in to confirm you’re not a bot') || text.includes("Sign in to confirm you're not a bot")) {
+    return 'YouTubeにBot判定されています。サーバーPCのChromeでYouTubeにログインし、サーバーを再起動してください。';
+  }
+  if (text.includes('No supported JavaScript runtime could be found') || text.includes('n challenge solving failed')) {
+    return 'YouTubeの再生URL解析に失敗しました。サーバーPCで `brew install deno` と `yt-dlp -U` を実行し、サーバーを再起動してください。起動ログに `JS runtime: deno` と `Remote components: ejs:npm` が出る必要があります。';
+  }
+  if (text.includes('Requested format is not available') || text.includes('Only images are available')) {
+    return '動画形式を取得できませんでした。サーバーPCでDeno導入、yt-dlp更新、YouTubeログイン済みChromeを確認し、サーバーを再起動してください。';
+  }
+  return text;
 }
 
 async function waitForPreparedDownload(jobId) {
@@ -313,6 +281,7 @@ function sleep(ms) {
 }
 
 function log(msg, type = '') {
+  if (!settings.showLog) return;
   logBox.classList.add('show');
   const span = document.createElement('div');
   span.textContent = msg;
