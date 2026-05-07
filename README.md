@@ -13,7 +13,6 @@ python tools/setup_wizard.py
 ```
 
 ---
-=======
 
 ### 1. yt-dlp をインストール
 
